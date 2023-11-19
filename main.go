@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -58,7 +59,7 @@ func main() {
 		log.Fatalln("Schedule is empty.")
 	}
 
-	// Make schedule add up to two weeks
+	// Make schedule length add up to the two week cycle duration
 	slices.Sort(c.Schedule)
 	scheduleTotal := 0
 	for scheduleVal := range c.Schedule {
@@ -101,14 +102,13 @@ func main() {
 						}
 						log.Println("Successfully created Discord session.")
 
+						s.LogLevel = discordgo.LogWarning
 						s.ShouldRetryOnRateLimit = true
-
 						done := make(chan bool)
 						s.AddHandler(func(s *discordgo.Session, m *discordgo.Connect) {
 							handleConnected(s, m)
 							done <- true
 						})
-						s.LogLevel = discordgo.LogWarning
 
 						if err = s.Open(); err != nil {
 							log.Fatalf("Could not initialize connection to Discord: %v\n", err)
@@ -207,8 +207,6 @@ func processReactions(s *discordgo.Session, m *discordgo.Message) ([]string, str
 	downVotesChan := make(chan []*discordgo.User)
 	errChan := make(chan error)
 
-	// Fetch sequentially to avoid rate limits
-
 	go func() {
 		// Get a slice of users which have already voted.
 		upVotes, err := s.MessageReactions(m.ChannelID, m.ID, "👍", 100, "", "")
@@ -235,8 +233,7 @@ func processReactions(s *discordgo.Session, m *discordgo.Message) ([]string, str
 		case err = <-errChan:
 			log.Printf("Could not fetch votes for message %s in channel %s: %v\n", m.ID, m.ChannelID, err)
 		case <-time.After(60 * time.Second):
-			return []string{""}, "", fmt.Errorf("timed out after 60 seconds for %s", m.Thread.Name)
-			// return []string{""}, "", fmt.Errorf("timed out after 5 seconds when fetching reactions for message %s in channel %s, guild %s", m.ID, m.ChannelID, m.GuildID)
+			return []string{""}, "", fmt.Errorf("timed out after 60 seconds for %s (channel %s, message %s)", m.Thread.Name, m.ChannelID, m.ID)
 		}
 	}
 
@@ -247,7 +244,7 @@ func processReactions(s *discordgo.Session, m *discordgo.Message) ([]string, str
 	}
 
 	threadLink := fmt.Sprintf("https://discord.com/channels/%s/%s", "775859454780244028", m.Thread.ID) // Hardcode JB GuildID. discordgo.Message.GuildID seems to be broken.
-	returnString := fmt.Sprintf("[%s](%s) - %dx👍, %dx👎", m.Thread.Name, threadLink, len(upVotes), len(downVotes))
+	returnString := fmt.Sprintf("%dx👍, %dx👎 - [%s](%s) ", len(upVotes), len(downVotes), m.Thread.Name, threadLink)
 	if len(upVotes) < 11 {
 		returnString += " (*below quorum*)"
 	}
@@ -308,18 +305,23 @@ func buildStringAndSend(s *discordgo.Session, startingString string, r Recipient
 	}
 
 	// Split string into 2000 character chunks to stay below Discord's message limit.
+	// Do this by line to avoid splitting tags and titles.
 	charLimit := 2000 // Discord character limit is 2000 characters.
 	var chunks []string
-	runeStr := []rune(startingString)
-	for i := 0; i < len(runeStr); i += charLimit {
-		end := i + charLimit
-		if end > len(runeStr) {
-			end = len(runeStr)
+	lines := strings.Split(startingString, "\n")
+	chunk := ""
+	for _, line := range lines {
+		if len(chunk)+len(line) > charLimit {
+			chunks = append(chunks, chunk)
+			chunk = ""
 		}
-		chunks = append(chunks, string(runeStr[i:end]))
+		chunk += line + "\n"
+	}
+	if chunk != "" {
+		chunks = append(chunks, chunk)
 	}
 
-	// Send out messages to recipients.
+	// Send out messages to recipients by chunk.
 	for _, channelId := range r.ChannelIDs {
 		go func(channelId string) {
 			for _, chunk := range chunks {
