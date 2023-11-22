@@ -75,11 +75,15 @@ func main() {
 		for {
 			// Calculate time until the next temperature check voting deadline
 			now := time.Now().UTC()
-			daysUntilTuesday := int(time.Tuesday-now.Weekday()+7) % 7
+			daysUntilTuesday := int(time.Tuesday-now.Weekday()+7) % 7 // Add 7 to make sure it's positive.
 
-			// Add 7 days if we're in an "off week".
 			_, week := now.ISOWeek()
-			if week%2 == 1 && now.Weekday() >= time.Tuesday || week%2 == 0 && now.Weekday() < time.Tuesday {
+			// Add 14 days (2 weeks) if today was the deadline
+			if week%2 == 1 && now.Weekday() == time.Tuesday {
+				daysUntilTuesday += 14
+			}
+			// Add 7 days if we're in an "off week".
+			if week%2 == 1 && now.Weekday() > time.Tuesday || week%2 == 0 && now.Weekday() <= time.Tuesday {
 				daysUntilTuesday += 7
 			}
 
