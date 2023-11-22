@@ -73,9 +73,16 @@ func main() {
 
 	go func() {
 		for {
-			// Calculate time until temperature check voting deadline
+			// Calculate time until the next temperature check voting deadline
 			now := time.Now().UTC()
 			daysUntilTuesday := int(time.Tuesday-now.Weekday()+7) % 7
+
+			// Add 7 days if we're in an "off week".
+			_, week := now.ISOWeek()
+			if week%2 == 1 && now.Weekday() >= time.Tuesday || week%2 == 0 && now.Weekday() < time.Tuesday {
+				daysUntilTuesday += 7
+			}
+
 			votingDeadline := now.AddDate(0, 0, daysUntilTuesday).Truncate(24 * time.Hour)
 
 			for _, s := range reversedSchedule {
@@ -179,6 +186,7 @@ func getCurrentThreads(s *discordgo.Session, p Pipeline, msgChan chan *discordgo
 	// Temp check ends every other Tuesday at midnight UTC.
 	now := time.Now().UTC()
 	daysSinceTuesday := int(now.Weekday()-time.Tuesday+7) % 7
+
 	lastTempCheckEnded := now.AddDate(0, 0, -daysSinceTuesday-7).Truncate(24 * time.Hour)
 
 	// Iterate through sources and find proposal threads which have been created since the end of the last temp check.
