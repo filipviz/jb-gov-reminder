@@ -256,8 +256,8 @@ func processReactions(s *discordgo.Session, m *discordgo.Message) ([]string, str
 	}
 
 	threadLink := fmt.Sprintf("https://discord.com/channels/%s/%s", "775859454780244028", m.Thread.ID) // Hardcode JB GuildID. discordgo.Message.GuildID seems to be broken.
-	returnString := fmt.Sprintf("%dx👍, %dx👎 - [%s](%s) ", len(upVotes), len(downVotes), m.Thread.Name, threadLink)
-	if len(upVotes) < 11 {
+	returnString := fmt.Sprintf("%dx👍, %dx👎 - [%s](%s) ", len(upVotes)-1, len(downVotes)-1, m.Thread.Name, threadLink)
+	if len(upVotes)-1 < 10 {
 		returnString += " (*below quorum*)"
 	}
 
