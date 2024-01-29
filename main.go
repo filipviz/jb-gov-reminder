@@ -78,8 +78,8 @@ func main() {
 			daysUntilTuesday := int(time.Tuesday-now.Weekday()+7) % 7 // Add 7 to make sure it's positive.
 
 			_, week := now.ISOWeek()
-			// Add 14 days (2 weeks) if we passed the deadline today.
-			if week%2 == 1 && now.Weekday() == time.Tuesday && now.Hour() >= 19 {
+			// Add 14 days (2 weeks) if today was the deadline
+			if week%2 == 1 && now.Weekday() == time.Tuesday {
 				daysUntilTuesday += 14
 			}
 			// Add 7 days if we're in an "off week".
