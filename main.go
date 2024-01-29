@@ -249,6 +249,10 @@ func processReactions(s *discordgo.Session, m *discordgo.Message) ([]string, str
 		}
 	}
 
+	if len(upVotes) == 0 && len(downVotes) == 0 {
+		return []string{""}, "", fmt.Errorf("ignoring, no votes for %s (channel %s, message %s)", m.Thread.Name, m.ChannelID, m.ID)
+	}
+
 	usersWhoVoted := append(upVotes, downVotes...)
 	userIdsWhoVoted := make([]string, len(usersWhoVoted))
 	for i, user := range usersWhoVoted {
